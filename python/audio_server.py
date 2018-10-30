@@ -11,8 +11,6 @@ import threading
 from google.api_core import exceptions
 import datetime
 
-SOCK_MAX_SIZE = 4
-
 class AudioStream(object):
     def __init__(self):
         self.queue = queue.Queue()
@@ -46,23 +44,20 @@ class AudioStream(object):
 class STTManager(object):
     client = speech.SpeechClient()
 
-    def __init__(self, conn, conn_list, addr, stream):
+    def __init__(self, stream, callback = None):
         self.config = types.RecognitionConfig(
             encoding=enums.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
-            language_code='en-US')
+            language_code='ko-KR')
         self.streaming_config = types.StreamingRecognitionConfig(
             config=self.config,
             single_utterance=False,
             interim_results=False)
-        self.conn = conn
-        self.conn_list = conn_list
-        self.addr = addr
         self.stream = stream
+        self.callback = callback
 
     def process_stt(self):
         while True:
-            print("test")
             generator = self.stream.generator()
             requests = (types.StreamingRecognizeRequest(audio_content=content) for content in generator)
             responses = self.client.streaming_recognize(self.streaming_config, requests)
@@ -77,13 +72,12 @@ class STTManager(object):
                         continue
  
                     transcript = result.alternatives[0].transcript
-                    print(datetime.datetime.now(), ":", self.addr, ",", transcript)
+                    print(datetime.datetime.now(), ":", transcript)
                     #print(result.is_final)
                     
-                    binary_transcript = transcript.encode()
-                    for con in self.conn_list:
-                        con.send(binary_transcript)
-                
+                    #need to write listener
+                    if self.callback:
+                        self.callback(transcript)
                 break
             except (exceptions.OutOfRange, exceptions.InvalidArgument) as e:
                 if not ('maximum allowed stream duration' in e.message or 'deadline too short' in e.message):
@@ -99,42 +93,3 @@ class STTManager(object):
 
     def join(self):
         self.thread.join()
-
-def process(conn, conn_list, addr):
-    stream = AudioStream()
-    manager = STTManager(conn, conn_list, addr, stream)
-    manager.run()
-
-    while 1:
-        try:
-            msg = conn.recv(8192)
-            if len(msg) == 0:
-                print(addr, " disconnected.")
-                break
-
-            stream.put(msg)
-        except socket.error as e:
-            print("Error receiving data: ", e)
-            break
-
-    stream.close()
-    manager.join()
-
-def run_audio_stt(port=9091):
-    host = '0.0.0.0'
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setblocking(True)
-        s.bind((host, port))
-        s.listen(SOCK_MAX_SIZE)
-        conn_list = []
-
-        while 1:
-            conn, addr = s.accept()
-            conn_list.append(conn)
-            print(addr, " connected.")
-            thread = threading.Thread(target=process, args=(conn, conn_list, addr))
-            thread.start()
-'''
-if __name__=='__main__':
-     run_server()
-'''
