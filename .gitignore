@@ -1,1 +1,9 @@
-Voucher-82ad460a212c.json
+*.o
+cpp/libarserver.so
+python/logFile.log
+python/faces
+python/dlib
+python/__pycache__
+python/3D-convolutional-speaker-recognition
+python/Voucher-82ad460a212c.json
+python/run.sh

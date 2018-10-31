@@ -34,9 +34,19 @@ extern "C" {
 		AudioHandler* handler = reinterpret_cast<AudioHandler*>(ptr);
 		handler->init(AV_CODEC_ID_WAVPACK, AV_CODEC_ID_AAC, 64000, 16000, 1, AV_SAMPLE_FMT_S16, 1024);
 	}
-	void audio_handler_get_decoded_pkt(void* ptr, unsigned char* buf, int readLen, unsigned char** data) {
-		AudioHandler* handler = reinterpret_cast<AudioHandler*>(ptr);
-		handler->getDecodedPkt(buf, readLen, data);
+	bool audio_handler_get_decoded_pkt(void* ptr, unsigned char* buf, int readLen, unsigned char** data, bool isRaw) {
+		if(isRaw) {
+			memcpy(*data, buf, readLen);
+			return true;
+		}
+		else {
+			AudioHandler* handler = reinterpret_cast<AudioHandler*>(ptr);
+			int ret = handler->getDecodedPkt(buf, readLen, data);
+			if(ret == AUDIO_SUCCESS)
+				return true;
+			if(ret == AUDIO_DEC_NOT_YET)
+				return false;
+		}
 	}
 	void audio_free_decoded_pkt(unsigned char** data) {
 		delete *data;
@@ -51,9 +61,9 @@ extern "C" {
 	void* video_handler_new() {
 		return new(std::nothrow) VideoHandler;
 	}
-	void video_handler_init(void* ptr) {
+	void video_handler_init(void* ptr, int width, int height) {
 		VideoHandler* handler = reinterpret_cast<VideoHandler*>(ptr);
-		handler->init(AV_CODEC_ID_H264, 640, 480);
+		handler->init(AV_CODEC_ID_H264, width, height);
 	}
 	bool video_handler_get_decoded_pkt(void* ptr, unsigned char* buf, int readLen, unsigned char** data) {
 		VideoHandler* handler = reinterpret_cast<VideoHandler*>(ptr);
@@ -77,7 +87,7 @@ extern "C" {
 			flag = 0;
 		else if(buf[0] == 0x01)
 			flag = 1;
-		
+	
 		pkt_buf = buf + 1;
 		pkt_len = len - 1;
 	}

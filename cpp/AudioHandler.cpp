@@ -79,8 +79,9 @@ AUDIO_HDR_ERR AudioHandler::getDecodedPkt(uint8_t* buf, int size, uint8_t** data
 
         int ret = avcodec_send_packet(decCodecCtx, decPkt);
         if(ret < 0) {
-                MSLOG::printErrorFFmpeg("logFile.log", "send packet", ret);
-                exit(1);
+		return AUDIO_DEC_NOT_YET;
+                //MSLOG::printErrorFFmpeg("logFile.log", "send packet", ret);
+                //exit(1);
         }
 
         while(ret >= 0) {
@@ -102,6 +103,7 @@ AUDIO_HDR_ERR AudioHandler::getDecodedPkt(uint8_t* buf, int size, uint8_t** data
 		memcpy(*data, rawPkt->data, spf);
 		break;
         }
+	return AUDIO_SUCCESS;
 }
 
 void AudioHandler::freeDecodedPkt(uint8_t** data) {

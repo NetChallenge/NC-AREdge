@@ -15,6 +15,7 @@ from PIL import Image
 from io import BytesIO
 import paho.mqtt.client as paho
 from functools import partial
+import threading
 
 def stt_transcript_callback(client, topic, data):
 	print("topic: " + topic + ", message: " + data)
@@ -47,6 +48,8 @@ def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, lo
 
 		traffic_start_time = datetime.datetime.now()
 		traffic = 0
+		
+		is_video_process = [False]
 		while True:
 			read_len = lib.ar_server_read(ar_server, buf, CHUNK)
 			#check traffic
@@ -72,12 +75,9 @@ def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, lo
 				np_video_decoded = np.zeros(int(width * height * 3 / 2), dtype=np.uint8)
 				video_decoded = np_video_decoded.ctypes.data_as(ctypes.POINTER(ctypes.c_ubyte))
 				if lib.video_handler_get_decoded_pkt(video_handler, pkt_buf, pkt_len, ctypes.byref(video_decoded)) == True:
-					#json_face_names = face_recognition_in_video(np_video_decoded, width, height, testcount)
-					#testcount+=1
-					#if json_face_names is not None:
-					#	json_face_names_p = ctypes.cast(json_face_names, ctypes.POINTER(ctypes.c_ubyte))
-					#	lib.ar_server_write(ar_server, json_face_names_p, len(json_face_names))
-					pass
+					if is_video_process[0] == False:
+						testcount += 1
+						threading.Thread(target=face_recognition_in_video, args=(np_video_decoded, width, height, testcount, loaded_face_encodings, loaded_face_names, is_video_process, lib, ar_server)).start()
 				else :
 					print("video packet not yet")
 			elif flag.value == 1:
@@ -92,24 +92,29 @@ def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, lo
 		stream.close()
 		manager.join()
 
-def face_recognition_in_video(yuv_frame, width, height, testcount):
+def face_recognition_in_video(yuv_frame, width, height, testcount, loaded_face_encodings, loaded_face_names, is_video_process, lib, ar_server):
+	is_video_process[0] = True
+
 	yuv_frame = yuv_frame.reshape((int)(height * 3 / 2), width)
 	#print(yuv_frame.shape)
 	rgb_frame = cv2.cvtColor(yuv_frame, cv2.COLOR_YUV420p2RGB)
-	cv2.imwrite("testimage/test"+str(testcount)+".jpg", rgb_frame)
 	#print(rgb_frame)
 	rgb_small_frame = cv2.resize(rgb_frame, (0,0), fx=0.25, fy=0.25)
+	#rgb_small_frame = cv2.warpAffine(rgb_small_frame, cv2.getRotationMatrix2D((width/8, height/8), 90, 1.0), (int(height/4), int(width/4)))
+	#cv2.imwrite("testimage/test"+str(testcount)+".jpg", rgb_small_frame)
 
 	face_locations = face_recognition.face_locations(rgb_small_frame)
 	if not face_locations:
+		is_video_process[0] = False
 		return None
 
 	face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 	if not face_encodings:
+		is_video_process[0] = False
 		return None
 	
-	print(face_locations)
-	print(face_encodings)
+	#print(face_locations)
+	#print(face_encodings)
 
 	face_names = []
 	for idx, face_encoding in enumerate(face_encodings):
@@ -117,17 +122,21 @@ def face_recognition_in_video(yuv_frame, width, height, testcount):
 		name = "Unknown"
 
 		if True in matches:
-			first_mach_index = matches.index(True)
+			first_match_index = matches.index(True)
 			name = loaded_face_names[first_match_index]
-			print(name+"\n")
+			#print(name+"\n")
 			face_names.append([name, face_locations[idx]])
 
 	if not face_names:
+		is_video_process[0] = False
 		return None
 
-	json_face_names = json.dump(face_names)
+	json_face_names = json.dumps(face_names)
 	print(json_face_names)
-	return json_face_names
+	json_face_names_p = ctypes.cast(json_face_names, ctypes.POINTER(ctypes.c_ubyte))
+	lib.ar_server_write(ar_server, json_face_names_p, len(json_face_names))	
+
+	is_video_process[0] = False
 
 def speaker_recognition(arr):
 	stream.put()

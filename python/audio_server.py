@@ -84,9 +84,6 @@ class STTManager(object):
                     raise
                 print("resume!!")
 
-        self.conn_list.remove(self.conn)
-           
-
     def run(self):
         self.thread = threading.Thread(target=self.process_stt)
         self.thread.start()

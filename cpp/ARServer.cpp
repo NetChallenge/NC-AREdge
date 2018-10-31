@@ -32,6 +32,7 @@ AR_SVR_ERR ARServer::acceptClient() {
 	if(clientSockFd == -1)
 		return MS_SVR_ACCEPT_SOCK_ERR;
 	cout << "client accepted. " << clientSockFd << endl;
+
 	return MS_SVR_SUCCESS;
 }
 
@@ -58,11 +59,12 @@ int ARServer::readPkt(unsigned char* buf, int size) {
 	}
 
 	readLen = 0;
-	int pktLength = int(buf[3] << 24 |
-			buf[2] << 16 |
-			buf[1] << 8 |
-			buf[0]);
+	int pktLength = int(buf[3] |
+			buf[2] << 8 |
+			buf[1] << 16 |
+			buf[0] << 24);
 
+	//cout << "pktLength: " << pktLength << endl;
 	if(pktLength > size)
 		return -1;
 
