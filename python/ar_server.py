@@ -17,11 +17,11 @@ import paho.mqtt.client as paho
 from functools import partial
 import threading
 
-def stt_transcript_callback(client, topic, data):
+def stt_transcript_callback(client, topic, user_name, data):
 	print("topic: " + topic + ", message: " + data)
-	client.publish(topic, data)
+	client.publish(topic, user_name + ":" + data)
 
-def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, edge_port, width, height, sdf, lib, CHUNK, traffic_duration):
+def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name, edge_port, width, height, sdf, lib, CHUNK, traffic_duration):
 	ar_server = lib.ar_server_new()
 	video_handler = lib.video_handler_new()
 	audio_handler = lib.audio_handler_new()
@@ -43,7 +43,7 @@ def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, lo
 		lib.ar_server_accept(ar_server)
 		#start manager
 		stream = audio_server.AudioStream()
-		manager = audio_server.STTManager(stream, partial(stt_transcript_callback, mqtt_client, mqtt_topic))
+		manager = audio_server.STTManager(stream, partial(stt_transcript_callback, mqtt_client, mqtt_topic, user_name))
 		manager.run()
 
 		traffic_start_time = datetime.datetime.now()
@@ -176,7 +176,8 @@ def load_face_image():
 def initialize():
 	room_id = os.environ.get('ROOM_ID', None)
 	user_email = os.environ.get('USER_EMAIL', None)
-	edge_port = os.environ.get('EDGE_PORT', None)
+	user_name = os.environ.get('USER_NAME', None)
+	edge_port = 5678
 	#we need to initialize this values
 	width = int(1280)
 	height = int(720)
@@ -195,7 +196,7 @@ def initialize():
 	mqtt_topic = os.environ.get('MQTT_TOPIC', None)
 
 	#load face image
-	rows = mysql_client.pymysql_fetch_query('SELECT image_url, user_name FROM face WHERE user_email=(SELECT user_email FROM room_user WHERE room_id='+room_id+');')
+	rows = mysql_client.pymysql_fetch_query('SELECT image_url, user_name FROM face WHERE user_email=ANY(SELECT user_email FROM room_user WHERE room_id='+room_id+');')
 
 	loaded_face_names = []
 	loaded_face_encodings = []
@@ -207,11 +208,11 @@ def initialize():
 		loaded_face_names.append(user_name)
 		loaded_face_encodings.append(face_recognition.face_encodings(np_img)[0])
 
-	return mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, edge_port, width, height, sdf, lib, CHUNK, traffic_duration
+	return mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name, edge_port, width, height, sdf, lib, CHUNK, traffic_duration
 
 def main():
-	mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, edge_port, width, height, sdf, lib, CHUNK, traffic_duration = initialize()
-	start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, edge_port, width, height, sdf, lib, CHUNK, traffic_duration)
+	mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name, edge_port, width, height, sdf, lib, CHUNK, traffic_duration = initialize()
+	start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name, edge_port, width, height, sdf, lib, CHUNK, traffic_duration)
 
 if __name__ == "__main__":
 	main()

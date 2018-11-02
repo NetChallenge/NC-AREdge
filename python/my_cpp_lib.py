@@ -6,7 +6,7 @@ CHUNK = 100000
 lib = cdll.LoadLibrary("/usr/local/lib/libavutil.so")
 lib = cdll.LoadLibrary("/usr/local/lib/libavcodec.so")
 lib = cdll.LoadLibrary("/usr/local/lib/libavformat.so")
-lib = cdll.LoadLibrary("../cpp/libarserver.so")
+lib = cdll.LoadLibrary("/root/ar-server/cpp/libarserver.so")
 
 #ar server
 lib.ar_server_new.restype = ctypes.c_void_p
