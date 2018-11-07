@@ -48,7 +48,8 @@ class STTManager(object):
         self.config = types.RecognitionConfig(
             encoding=enums.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
-            language_code='ko-KR')
+            language_code='ko-KR',
+            enable_word_time_offsets=True)
         self.streaming_config = types.StreamingRecognitionConfig(
             config=self.config,
             single_utterance=False,
@@ -72,12 +73,14 @@ class STTManager(object):
                         continue
  
                     transcript = result.alternatives[0].transcript
-                    print(datetime.datetime.now(), ":", transcript)
                     #print(result.is_final)
                     
                     #need to write listener
                     if self.callback:
-                        self.callback(transcript)
+                        start_time = result.alternatives[0].words[0].start_time
+                        end_time = result.alternatives[0].words[len(result.alternatives[0].words)-1].end_time
+                        time_diff = (end_time.seconds - start_time.seconds) + (end_time.nanos * 1e-9 - start_time.nanos * 1e-9)
+                        self.callback(transcript, time_diff)
                 break
             except (exceptions.OutOfRange, exceptions.InvalidArgument) as e:
                 if not ('maximum allowed stream duration' in e.message or 'deadline too short' in e.message):

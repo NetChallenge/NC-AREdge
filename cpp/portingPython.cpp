@@ -48,6 +48,15 @@ extern "C" {
 				return false;
 		}
 	}
+
+	bool is_my_voice(unsigned char* buf, unsigned char*& pkt_buf ) {
+		pkt_buf = buf + 1;
+		if(buf[0] == 0)
+			return false;
+		else
+			return true;
+	}
+
 	void audio_free_decoded_pkt(unsigned char** data) {
 		delete *data;
 	}

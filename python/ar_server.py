@@ -11,15 +11,19 @@ import my_mysql
 import my_cpp_lib
 import requests
 import datetime
+import time
 from PIL import Image
 from io import BytesIO
 import paho.mqtt.client as paho
 from functools import partial
 import threading
 
-def stt_transcript_callback(client, topic, user_name, data):
-	print("topic: " + topic + ", message: " + data)
-	client.publish(topic, user_name + ":" + data)
+def stt_transcript_callback(client, topic, user_name, is_my_voice, data, time_length):
+	time_diff = time.time() - is_my_voice[0]
+	print("time_diff: " + str(time_diff) + ", time_length: " + str(time_length))
+	if time_diff <= time_length + 1:
+		print("topic: " + topic + ", message: " + data)
+		client.publish(topic, user_name + ":" + data)
 
 def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name, edge_port, width, height, sdf, lib, CHUNK, traffic_duration):
 	ar_server = lib.ar_server_new()
@@ -39,11 +43,12 @@ def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, lo
 	pkt_len = ctypes.c_int()
 
 	testcount = 0
+	is_my_voice = [time.time()]
 	while True:
 		lib.ar_server_accept(ar_server)
 		#start manager
 		stream = audio_server.AudioStream()
-		manager = audio_server.STTManager(stream, partial(stt_transcript_callback, mqtt_client, mqtt_topic, user_name))
+		manager = audio_server.STTManager(stream, partial(stt_transcript_callback, mqtt_client, mqtt_topic, user_name, is_my_voice))
 		manager.run()
 
 		traffic_start_time = datetime.datetime.now()
@@ -81,6 +86,9 @@ def start_ar_server(mysql_client, mqtt_client, mqtt_topic, loaded_face_names, lo
 				else :
 					print("video packet not yet")
 			elif flag.value == 1:
+				if lib.is_my_voice(pkt_buf, ctypes.byref(pkt_buf)) == True:
+					is_my_voice[0] = time.time()
+
 				np_audio_decoded = np.zeros(sdf, dtype=np.uint8)
 				audio_decoded = np_audio_decoded.ctypes.data_as(ctypes.POINTER(ctypes.c_ubyte))
 				if lib.audio_handler_get_decoded_pkt(audio_handler, pkt_buf, pkt_len, ctypes.byref(audio_decoded), True) == True:
@@ -176,7 +184,7 @@ def load_face_image():
 def initialize():
 	room_id = os.environ.get('ROOM_ID', None)
 	user_email = os.environ.get('USER_EMAIL', None)
-	user_name = os.environ.get('USER_NAME', None)
+	user_name_env = os.environ.get('USER_NAME', None)
 	edge_port = 5678
 	#we need to initialize this values
 	width = int(1280)
@@ -208,7 +216,7 @@ def initialize():
 		loaded_face_names.append(user_name)
 		loaded_face_encodings.append(face_recognition.face_encodings(np_img)[0])
 
-	return mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name, edge_port, width, height, sdf, lib, CHUNK, traffic_duration
+	return mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name_env, edge_port, width, height, sdf, lib, CHUNK, traffic_duration
 
 def main():
 	mysql_client, mqtt_client, mqtt_topic, loaded_face_names, loaded_face_encodings, room_id, user_email, user_name, edge_port, width, height, sdf, lib, CHUNK, traffic_duration = initialize()

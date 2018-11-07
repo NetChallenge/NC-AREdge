@@ -40,5 +40,9 @@ lib.audio_handler_release.argtypes = [ctypes.c_void_p]
 #
 lib.pkt_check.argtypes = [ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), ctypes.POINTER(ctypes.c_int)]
 
+#
+lib.is_my_voice.restype = ctypes.c_bool
+lib.is_my_voice.argtypes = [ctypes.POINTER(ctypes.c_ubyte), ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte))]
+
 def get_lib():
 	return lib
